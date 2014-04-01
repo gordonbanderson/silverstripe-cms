@@ -859,9 +859,10 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @uses ViewerGroups()
 	 *
 	 * @param Member|int|null $member
+	 * @param boolean $ancestryChecked
 	 * @return boolean True if the current user can view this page.
 	 */
-	public function canView($member = null) {
+	public function canView($member = null, $ancestryChecked = false) {
 		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
 			$member = Member::currentUserID();
 		}
@@ -895,8 +896,20 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 		// check for inherit
 		if($this->CanViewType == 'Inherit') {
-			if($this->ParentID) return $this->Parent()->canView($member);
-			else return $this->getSiteConfig()->canView($member);
+			// only recurse through the parental ancestry if it has not already been checked
+			if (!$ancestryChecked) {
+				if($this->ParentID) {
+					return $this->Parent()->canView($member);
+				}
+				else {
+					return $this->getSiteConfig()->canView($member);
+				}
+			// from Hierarchy children() method, we will only be checking if the parents are visible.
+			} else {
+				// FIXME, is this correct?
+				return $this->getSiteConfig()->canView($member);
+			}
+			
 		}
 		
 		// check for any logged-in users
