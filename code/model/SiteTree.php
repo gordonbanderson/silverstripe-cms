@@ -850,6 +850,15 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	}
 
 
+	public function canView($member = null, $ancestryChecked = false) {
+		if (!isset($this->CachedCanView)) {
+			$this->CachedCanView = $this->UncachedCanView($member,$ancestryChecked);
+		}
+		return $this->CachedCanView;
+	}
+
+
+
 	/**
 	 * This function should return true if the current user can view this
 	 * page. It can be overloaded to customise the security model for an
@@ -868,7 +877,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @param boolean $ancestryChecked
 	 * @return boolean True if the current user can view this page.
 	 */
-	public function canView($member = null, $ancestryChecked = false) {
+	private function UncachedCanView($member = null, $ancestryChecked = false) {
 		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
 			$member = Member::currentUserID();
 		}
