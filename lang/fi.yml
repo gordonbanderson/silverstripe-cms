@@ -75,6 +75,7 @@ fi:
     AddNew: 'Lisää uusi sivu'
     AddNewButton: 'Lisää uusi'
     AddPageRestriction: 'Huomio: Tietyt sivutyypit eivät ole sallittuja valitun sivutyypin alle.'
+    Cancel: Peruuta
     ChoosePageParentMode: 'Valitse kohde, minne sivu luodaan'
     ChoosePageType: 'Valitse sivutyyppi'
     Create: Luo
@@ -199,6 +200,8 @@ fi:
     415: '415 - Tukematon mediatyyppi'
     416: '416 - Pyydetty alue ei kelpaa'
     417: '417 - Oletus epäonnistui'
+    422: '422 - Käsittely ei onnistu: semanttinen virhe?'
+    429: '429 - Liian monta pyyntöä'
     500: '500 - Sisäinen Palvelin Virhe'
     501: '501 - Ei toteutettu'
     502: '502 - Virheellinen Yhdyskäytävä'
@@ -409,3 +412,9 @@ fi:
     MENUTITLE: 'Muokkaa sivua'
   CMSSettingsController:
     MENUTITLE: Asetukset
+  CMSSiteTreeFilter_StatusDeletedPages:
+    Title: 'Poistetut sivut'
+  CMSSiteTreeFilter_StatusDraftPages:
+    Title: 'Vedokset julkaisemattomista sivuista'
+  CMSSiteTreeFilter_StatusRemovedFromDraftPages:
+    Title: 'Näkyvillä, mutta poistettu vedoksista'

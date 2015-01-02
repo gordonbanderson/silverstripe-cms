@@ -593,6 +593,22 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	}
 	
 	/**
+	 * Check if the parent of this page has been removed (or made otherwise unavailable), and 
+	 * is still referenced by this child. Any such orphaned page may still require access via
+	 * the cms, but should not be shown as accessible to external users.
+	 * 
+	 * @return bool
+	 */
+	public function isOrphaned() {
+		// Always false for root pages
+		if(empty($this->ParentID)) return false;
+		
+		// Parent must exist and not be an orphan itself
+		$parent = $this->Parent();
+		return !$parent || !$parent->exists() || $parent->isOrphaned();
+	}
+	
+	/**
 	 * Return "link" or "current" depending on if this is the {@link SiteTree::isCurrent()} current page.
 	 *
 	 * @return string
@@ -901,6 +917,9 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			// check to make sure this version is the live version and so can be viewed
 			if (Versioned::get_versionnumber_by_stage($this->class, 'Live', $this->ID) != $this->Version) return false;
 		}
+		
+		// Orphaned pages (in the current stage) are unavailable, except for admins via the CMS
+		if($this->isOrphaned()) return false;
 
 		// Standard mechanism for accepting permission changes from extensions
 		$extended = $this->extendedCan('canView', $member);
@@ -1389,7 +1408,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	public function MetaTags($includeTitle = true) {
 		$tags = "";
 		if($includeTitle === true || $includeTitle == 'true') {
-			$tags .= "<title>" . $this->Title . "</title>\n";
+			$tags .= "<title>" . Convert::raw2xml($this->Title) . "</title>\n";
 		}
 
 		$generator = trim(Config::inst()->get('SiteTree', 'meta_generator'));
@@ -1406,7 +1425,11 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			$tags .= $this->ExtraMeta . "\n";
 		} 
 		
-		if(Permission::check('CMS_ACCESS_CMSMain') && in_array('CMSPreviewable', class_implements($this)) && !$this instanceof ErrorPage) {
+		if(Permission::check('CMS_ACCESS_CMSMain')
+			&& in_array('CMSPreviewable', class_implements($this))
+			&& !$this instanceof ErrorPage
+			&& $this->ID > 0
+		) {
 			$tags .= "<meta name=\"x-page-id\" content=\"{$this->ID}\" />\n";
 			$tags .= "<meta name=\"x-cms-edit-link\" content=\"" . $this->CMSEditLink() . "\" />\n";
 		}
@@ -1567,7 +1590,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		parent::onBeforeDelete();
 		
 		// If deleting this page, delete all its children.
-		if(SiteTree::config()->enforce_strict_hierarchy && $children = $this->Children()) {
+		if(SiteTree::config()->enforce_strict_hierarchy && $children = $this->AllChildren()) {
 			foreach($children as $child) {
 				$child->delete();
 			}
@@ -1924,14 +1947,14 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 				->setFieldFormatting(array(
 					'Title' => function($value, &$item) {
 						return sprintf(
-							'<a href=\"admin/pages/edit/show/%d\">%s</a>',
+							'<a href="admin/pages/edit/show/%d">%s</a>',
 							(int)$item->ID,
 							Convert::raw2xml($item->Title)
 						);
 					},
 					'AbsoluteLink' => function($value, &$item) {
 						return sprintf(
-							'<a href=\"%s\">%s</a>',
+							'<a href="%s" target="_blank">%s</a>',
 							Convert::raw2xml($value),
 							Convert::raw2xml($value)
 						);
@@ -2737,13 +2760,14 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 		return isset($stack[$level-1]) ? $stack[$level-1] : null;
 	}
-	
+
 	/**
 	 * Return the CSS classes to apply to this node in the CMS tree
 	 *
+	 * @param string $numChildrenMethod
 	 * @return string
 	 */
-	public function CMSTreeClasses() {
+	public function CMSTreeClasses($numChildrenMethod="numChildren") {
 		$classes = sprintf('class-%s', $this->class);
 		if($this->HasBrokenFile || $this->HasBrokenLink) {
 			$classes .= " BrokenLink";
@@ -2770,7 +2794,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		if($this->hasExtension('Translatable') && $controller->Locale != Translatable::default_locale() && !$this->isTranslation())
 			$classes .= " untranslated ";
 		*/
-		$classes .= $this->markingClasses();
+		$classes .= $this->markingClasses($numChildrenMethod);
 
 		return $classes;
 	}
@@ -2812,8 +2836,11 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		
 		$stageVersion = Versioned::get_versionnumber_by_stage('SiteTree', 'Stage', $this->ID);
 		$liveVersion =	Versioned::get_versionnumber_by_stage('SiteTree', 'Live', $this->ID);
-
-		return ($stageVersion && $stageVersion != $liveVersion);
+		
+		$isModified = ($stageVersion && $stageVersion != $liveVersion);
+		$this->extend('getIsModifiedOnStage', $isModified);
+		
+		return $isModified;
 	}
 	
 	/**

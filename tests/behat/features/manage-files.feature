@@ -5,8 +5,8 @@ Feature: Manage files
   So that I can insert them into my content efficiently
 
   Background:
-    Given a "image" "assets/folder1/file1.jpg"
-    And a "image" "assets/folder1/folder1.1/file2.jpg"
+    Given a "image" "assets/folder1/file1.jpg" was created "2012-01-01 12:00:00"
+    And a "image" "assets/folder1/folder1.1/file2.jpg" was created "2010-01-01 12:00:00"
     And a "folder" "assets/folder2"
     And I am logged in with "ADMIN" permissions
     And I go to "/admin/assets"
@@ -71,7 +71,15 @@ Feature: Manage files
   Scenario: I can filter the files list view using filetype
     Given a "file" "assets/document.pdf"
     And I expand the "Filter" CMS Panel
-    And I select "Image" from "File type"
+    And I select "Image" from "File type" with javascript
     And I press the "Apply Filter" button
     Then the "Files" table should contain "file1"
     And the "Files" table should not contain "document"
+
+  Scenario: I can filter out files that don't match the date range
+    Given I expand the "Filter" CMS Panel
+    And I fill in "From" with "2003-01-01"
+    And I fill in "To" with "2011-01-01"
+    And I press the "Apply Filter" button
+    And the "Files" table should contain "file2"
+    And the "Files" table should not contain "file1"

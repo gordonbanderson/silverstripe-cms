@@ -7,6 +7,7 @@ So that I can link to a external website or a page on my site
   Background:
     Given a "page" "Home"
     And a "page" "About Us" has the "Content" "My awesome content"
+    And a "page" "Details" has the "Content" "My sub-par content<a name="youranchor"></a>"
     And a "file" "assets/file1.jpg"
     And I am logged in with "ADMIN" permissions
     And I go to "/admin/pages"
@@ -15,7 +16,7 @@ So that I can link to a external website or a page on my site
   Scenario: I can link to an internal page
     Given I select "awesome" in the "Content" HTML field
     And I press the "Insert Link" button
-    When I check "Page on the site"
+    When I select the "Page on the site" radio button
     And I fill in the "Page" dropdown with "Home"
     And I fill in "my desc" for "Link description"
     And I press the "Insert" button
@@ -24,10 +25,22 @@ So that I can link to a external website or a page on my site
     # Required to avoid "unsaved changes" browser dialog
     Then I press the "Save draft" button
 
+  Scenario: I can link to an anchor in an internal page
+    Given I select "awesome" in the "Content" HTML field
+    And I press the "Insert Link" button
+    And I select the "Page on the site" radio button
+    And I fill in the "Page" dropdown with "Details"
+    And I wait for 1 second
+    And I select "youranchor" from "Form_EditorToolbarLinkForm_AnchorSelector"
+    And I press the "Insert link" button
+    Then the "Content" HTML field should contain "<a href="[sitetree_link,id=3]#youranchor">awesome</a>"
+    # Required to avoid "unsaved changes" browser dialog
+    Then I press the "Save draft" button
+
   Scenario: I can link to an external URL
     Given I select "awesome" in the "Content" HTML field
     And I press the "Insert Link" button
-    When I check "Another website"
+    When I select the "Another website" radio button
     And I fill in "http://silverstripe.org" for "URL"
     And I check "Open link in a new window"
     And I press the "Insert" button
@@ -38,7 +51,7 @@ So that I can link to a external website or a page on my site
   Scenario: I can link to a file
     Given I select "awesome" in the "Content" HTML field
     When I press the "Insert Link" button
-    When I check "Download a file"
+    When I select the "Download a file" radio button
     And I fill in the "File" dropdown with "file1.jpg"
     And I press the "Insert link" button
     Then the "Content" HTML field should contain "<a href="[file_link,id=1]" target="_blank">awesome</a>"
@@ -46,11 +59,10 @@ So that I can link to a external website or a page on my site
     Then I press the "Save draft" button
 
   Scenario: I can link to an anchor
-    Given I fill in the "Content" HTML field with "<p>My awesome content<a name=myanchor></a></p>"
+    Given I fill in the "Content" HTML field with "<p>My awesome content<a name='myanchor'></a></p>"
     And I select "awesome" in the "Content" HTML field
     When I press the "Insert Link" button
-    When I check "Anchor on this page"
-    # Need to hard-code the id attribute of the <select> here, as there are two form fields to pick from
+    When I select the "Anchor on this page" radio button
     And I select "myanchor" from "Form_EditorToolbarLinkForm_AnchorSelector"
     And I press the "Insert link" button
     Then the "Content" HTML field should contain "<a href="#myanchor">awesome</a>"
@@ -58,7 +70,7 @@ So that I can link to a external website or a page on my site
     Then I press the "Save draft" button
 
   Scenario: I can edit a link
-    Given I fill in the "Content" HTML field with "<p>My <a href=http://silverstripe.org>awesome</a> content"
+    Given I fill in the "Content" HTML field with "<p>My <a href='http://silverstripe.org'>awesome</a> content"
     And I select "awesome" in the "Content" HTML field
     When I press the "Insert Link" button
     # We need to hard-code the <input> id attribute, if you say 'Then the URL field', it picks up URLSegment instead.
@@ -71,7 +83,7 @@ So that I can link to a external website or a page on my site
     Then I press the "Save draft" button
 
   Scenario: I can remove a link
-    Given I fill in the "Content" HTML field with "My <a href=http://silverstripe.org>awesome</a> content"
+    Given I fill in the "Content" HTML field with "My <a href='http://silverstripe.org'>awesome</a> content"
     And I select "awesome" in the "Content" HTML field
     When I press the "Unlink" button
     Then the "Content" HTML field should contain "My awesome content"
