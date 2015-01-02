@@ -166,6 +166,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	*/
 	private static $can_create = true;
 
+	/*
+	In order to avoid multiple repeated checks of parental canView method, cache the results
+	in an array mapping member ID -> Site Tree ID -> true/false
+	*/
+	private static $cached_can_view = array();
+
 	/**
 	 * Icon to use in the CMS page tree. This should be the full filename, relative to the webroot.
 	 * Also supports custom CSS rule contents (applied to the correct selector for the tree UI implementation).
@@ -860,6 +866,40 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	}
 
 
+	/*
+	Cache the value of can view of a site tree object for a given member
+	@param $member Member object or null
+	@param $canview - true or false depending on whether $member can view the page
+	*/
+	private function cacheCanView($member, $canview) {
+		error_log('++++ START CACHE CAN VIEW ++++');
+		$cache = self::$cached_can_view;
+
+		error_log(print_r($cache,1));
+		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
+			$member = Member::currentUserID();
+		}
+
+		// we want $member as an ID
+		if (is_a($member, 'Member')) {
+			$member = $member->ID;
+		}
+
+		if (!isset($cache[$member])) {
+			if (!isset($cache[$member])) {
+				error_log('CREATING NEW ARRAY');
+				$cache[$member] = array();
+			}
+		}
+
+		$cache[$member][$this->ID] = $canview;
+		self::$cached_can_view = $cache;
+
+		error_log('CACHING:msc '.$member.' - '.$this->ID.' - ' . $canview.' - '.$this->Title);
+		error_log(print_r($cache,1));
+	}
+
+
 	/**
 	 * This function should return true if the current user can view this
 	 * page. It can be overloaded to customise the security model for an
@@ -878,12 +918,30 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return boolean True if the current user can view this page.
 	 */
 	public function canView($member = null) {
+		$cache = self::$cached_can_view;
+		error_log('------ CHECKING CAN VIEW FOR '.$this->ID.' - '.$this->Title.'------');
+		error_log(print_r($cache,1));
 		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
 			$member = Member::currentUserID();
 		}
 
+		$memberid = $member;
+		// we want $member as an ID
+		if (is_a($member, 'Member')) {
+			$memberid = $member->ID;
+		}
+
+		$cache = self::$cached_can_view;
+		if (isset($cache[$memberid][$this->ID])) {
+			error_log('CHECKING: Returning cached can view for '.$this->ID);
+			return $cache[$memberid][$this->ID];
+		}
+
 		// admin override
-		if($member && Permission::checkMember($member, array("ADMIN", "SITETREE_VIEW_ALL"))) return true;
+		if($member && Permission::checkMember($member, array("ADMIN", "SITETREE_VIEW_ALL"))) {
+			$this->cacheCanView($member, true);
+			return true;
+		}
 
 		// make sure we were loaded off an allowed stage
 
@@ -899,27 +957,49 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			&& !Permission::checkMember($member, array('CMS_ACCESS_LeftAndMain', 'CMS_ACCESS_CMSMain', 'VIEW_DRAFT_CONTENT'))) {
 			// If we weren't definitely loaded from live, and we can't view non-live content, we need to
 			// check to make sure this version is the live version and so can be viewed
-			if (Versioned::get_versionnumber_by_stage($this->class, 'Live', $this->ID) != $this->Version) return false;
+			if (Versioned::get_versionnumber_by_stage($this->class, 'Live', $this->ID) != $this->Version)  {
+				$this->cacheCanView($member, false);
+				return false;
+			}
 		}
 		
 		// Orphaned pages (in the current stage) are unavailable, except for admins via the CMS
-		if($this->isOrphaned()) return false;
+		if($this->isOrphaned()) {
+			$this->cacheCanView($member, true);
+			return false;
+		}
 
 		// Standard mechanism for accepting permission changes from extensions
 		$extended = $this->extendedCan('canView', $member);
-		if($extended !== null) return $extended;
-		
+		if($extended !== null) {
+			$this->cacheCanView($member, $extended);
+			return $extended;
+		}
+
 		// check for empty spec
-		if(!$this->CanViewType || $this->CanViewType == 'Anyone') return true;
+		if(!$this->CanViewType || $this->CanViewType == 'Anyone') {
+			$this->cacheCanView($member, true);
+			return true;
+		}
 
 		// check for inherit
 		if($this->CanViewType == 'Inherit') {
-			if($this->ParentID) return $this->Parent()->canView($member);
-			else return $this->getSiteConfig()->canView($member);
+			if($this->ParentID) {
+				error_log("CHECKING PARENT");
+				$result = $this->Parent()->canView($member);
+				$this->cacheCanView($member, $result);
+				return $result;
+			}
+			else {
+				$result = $this->getSiteConfig()->canView($member);
+				$this->cacheCanView($member, $result);
+				return $result;
+			}
 		}
 		
 		// check for any logged-in users
 		if($this->CanViewType == 'LoggedInUsers' && $member) {
+			$this->cacheCanView($member, true);
 			return true;
 		}
 		
@@ -929,8 +1009,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			$this->CanViewType == 'OnlyTheseUsers' 
 			&& $member 
 			&& $member->inGroups($this->ViewerGroups())
-		) return true;
-		
+		) {
+			$this->cacheCanView($member, true);
+			return true;
+		}
+
+		$this->cacheCanView($member, false);
 		return false;
 	}
 	
