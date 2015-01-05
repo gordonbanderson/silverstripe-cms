@@ -627,7 +627,16 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		}
 		
 		// Parent must exist and not be an orphan itself
-		$parent = $this->Parent();
+		$parent = null;
+
+		// Check for a cached parent being provided
+		if (isset($this->CachedParent)) {
+			$parent = $this->CachedParent;
+		} else {
+			$parent = $this->Parent();
+			$this->CachedParent = $parent;
+		}
+
 		$result = !$parent || !$parent->exists() || $parent->isOrphaned();
 		$cache[$this->ID] = $result;
 		self::$_cached_is_orphaned = $cache;
@@ -1003,7 +1012,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		// check for inherit
 		if($this->CanViewType == 'Inherit') {
 			if($this->ParentID) {
-				$result = $this->Parent()->canView($member);
+				$parent = $this->CachedParent;
+				if (!$this->CachedParent) {
+					$parent = $this->Parent();
+				}
+
+				$result = $parent->canView($member);
 				$this->cacheCanView($member, $result);
 				return $result;
 			}
