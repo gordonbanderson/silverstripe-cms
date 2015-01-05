@@ -470,7 +470,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return string
 	 */
 	public function Link($action = null) {
-		return Controller::join_links(Director::baseURL(), $this->RelativeLink($action));
+		if (isset($this->CachedLink)) {
+			return $this->CachedLink;
+		} else {
+			return Controller::join_links(Director::baseURL(), $this->RelativeLink($action));
+		}
+		
 	}
 	
 	/**
@@ -872,10 +877,8 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	@param $canview - true or false depending on whether $member can view the page
 	*/
 	private function cacheCanView($member, $canview) {
-		error_log('++++ START CACHE CAN VIEW ++++');
 		$cache = self::$cached_can_view;
 
-		error_log(print_r($cache,1));
 		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
 			$member = Member::currentUserID();
 		}
@@ -887,16 +890,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 		if (!isset($cache[$member])) {
 			if (!isset($cache[$member])) {
-				error_log('CREATING NEW ARRAY');
 				$cache[$member] = array();
 			}
 		}
 
 		$cache[$member][$this->ID] = $canview;
 		self::$cached_can_view = $cache;
-
-		error_log('CACHING:msc '.$member.' - '.$this->ID.' - ' . $canview.' - '.$this->Title);
-		error_log(print_r($cache,1));
 	}
 
 
@@ -919,8 +918,6 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 */
 	public function canView($member = null) {
 		$cache = self::$cached_can_view;
-		error_log('------ CHECKING CAN VIEW FOR '.$this->ID.' - '.$this->Title.'------');
-		error_log(print_r($cache,1));
 		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
 			$member = Member::currentUserID();
 		}
@@ -933,7 +930,6 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 		$cache = self::$cached_can_view;
 		if (isset($cache[$memberid][$this->ID])) {
-			error_log('CHECKING: Returning cached can view for '.$this->ID);
 			return $cache[$memberid][$this->ID];
 		}
 
@@ -985,7 +981,6 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		// check for inherit
 		if($this->CanViewType == 'Inherit') {
 			if($this->ParentID) {
-				error_log("CHECKING PARENT");
 				$result = $this->Parent()->canView($member);
 				$this->cacheCanView($member, $result);
 				return $result;
