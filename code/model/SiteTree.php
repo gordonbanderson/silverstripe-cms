@@ -242,6 +242,13 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	private static $meta_generator = 'SilverStripe - http://silverstripe.org';
 
 	protected $_cache_statusFlags = null;
+
+	/*
+	Cache of isOrphaned, to avoid repeated calls to Parent() method from several children, all getting 
+	the same parent object.  Mapping is ID -> true/false, depending on whether orphaned or not
+	*/
+	private static $_cached_is_orphaned = array();
+
 	
 	/**
 	 * Determines if the system should avoid orphaned pages
@@ -605,12 +612,27 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return bool
 	 */
 	public function isOrphaned() {
+		// check cache first in order to avoid unecessary Parent() method calls
+		$cache = self::$_cached_is_orphaned;
+
+		if (isset($cache[$this->ID])) {
+			return $cache[$this->ID];
+		}
+
 		// Always false for root pages
-		if(empty($this->ParentID)) return false;
+		if(empty($this->ParentID)) {
+			$cache[$this->ID] = false;
+			self::$_cached_is_orphaned = $cache;
+			return false;
+		}
 		
 		// Parent must exist and not be an orphan itself
 		$parent = $this->Parent();
-		return !$parent || !$parent->exists() || $parent->isOrphaned();
+		$result = !$parent || !$parent->exists() || $parent->isOrphaned();
+		$cache[$this->ID] = $result;
+		self::$_cached_is_orphaned = $cache;
+
+		return $result;
 	}
 	
 	/**
@@ -961,7 +983,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		
 		// Orphaned pages (in the current stage) are unavailable, except for admins via the CMS
 		if($this->isOrphaned()) {
-			$this->cacheCanView($member, true);
+			$this->cacheCanView($member, false);
 			return false;
 		}
 
