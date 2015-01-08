@@ -4,4 +4,9 @@
 		SiteTree::clearIsOrphanedCache();
 		SiteTree::clearCanViewCache();
 	}
+
+	public function onBeforeWrite() {
+		SiteTree::clearIsOrphanedCache();
+		SiteTree::clearCanViewCache();
+	}
 }
