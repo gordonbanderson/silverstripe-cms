@@ -909,6 +909,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	*/
 	private function cacheCanView($member, $canview) {
 		$cache = self::$cached_can_view;
+		$mode = Versioned::get_reading_mode();
 
 		if(!$member || !(is_a($member, 'Member')) || is_numeric($member)) {
 			$member = Member::currentUserID();
@@ -919,13 +920,16 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			$member = $member->ID;
 		}
 
-		if (!isset($cache[$member])) {
-			if (!isset($cache[$member])) {
-				$cache[$member] = array();
+		// member is now a number
+		$cachekey = $member.'_'.$mode;
+
+		if (!isset($cache[$cachekey])) {
+			if (!isset($cache[$cachekey])) {
+				$cache[$cachekey] = array();
 			}
 		}
 
-		$cache[$member][$this->ID] = $canview;
+		$cache[$cachekey][$this->ID] = $canview;
 		self::$cached_can_view = $cache;
 	}
 
@@ -960,8 +964,10 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		}
 
 		$cache = self::$cached_can_view;
-		if (isset($cache[$memberid][$this->ID])) {
-			return $cache[$memberid][$this->ID];
+		$mode = Versioned::get_reading_mode();
+		$cachekey = $memberid.'_'.$mode;
+		if (isset($cache[$cachekey][$this->ID])) {
+			return $cache[$cachekey][$this->ID];
 		}
 
 		// admin override
