@@ -603,6 +603,20 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			Director::get_current_page() instanceof SiteTree && in_array($this->ID, Director::get_current_page()->getAncestors()->column())
 		);
 	}
+
+	/*
+	Clear the is orphaned cache, called from SiteTreeCacheExtension after a publish is effected
+	*/
+	public static function clearIsOrphanedCache() {
+		self::$_cached_is_orphaned = array();
+	}
+
+	/*
+	Clear the is orphaned cache, called from SiteTreeCacheExtension after a publish is effected
+	*/
+	public static function clearCanViewCache() {
+		self::$cached_can_view = array();
+	}
 	
 	/**
 	 * Check if the parent of this page has been removed (or made otherwise unavailable), and 
@@ -614,14 +628,16 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	public function isOrphaned() {
 		// check cache first in order to avoid unecessary Parent() method calls
 		$cache = self::$_cached_is_orphaned;
+		$mode = Versioned::get_reading_mode();
+		$cachekey = $this->ID.'_'.$mode;
 
-		if (isset($cache[$this->ID])) {
-			return $cache[$this->ID];
+		if (isset($cache[$cachekey])) {
+			return $cache[$cachekey];
 		}
 
 		// Always false for root pages
 		if(empty($this->ParentID)) {
-			$cache[$this->ID] = false;
+			$cache[$cachekey] = false;
 			self::$_cached_is_orphaned = $cache;
 			return false;
 		}
@@ -638,7 +654,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		}
 
 		$result = !$parent || !$parent->exists() || $parent->isOrphaned();
-		$cache[$this->ID] = $result;
+		$cache[$cachekey] = $result;
 		self::$_cached_is_orphaned = $cache;
 
 		return $result;
@@ -966,6 +982,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		$cache = self::$cached_can_view;
 		$mode = Versioned::get_reading_mode();
 		$cachekey = $memberid.'_'.$mode;
+
 		if (isset($cache[$cachekey][$this->ID])) {
 			return $cache[$cachekey][$this->ID];
 		}
