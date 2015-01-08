@@ -982,6 +982,9 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		$cache = self::$cached_can_view;
 		$mode = Versioned::get_reading_mode();
 		$cachekey = $memberid.'_'.$mode;
+		if (isset($member->CanViewWhichStage)) {
+			$cachekey .= '|'.$member->CanViewWhichStage;
+		}
 
 		if (isset($cache[$cachekey][$this->ID])) {
 			return $cache[$cachekey][$this->ID];
@@ -1087,8 +1090,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		Versioned::reading_stage($stage);
 
 		$versionFromStage = DataObject::get($this->class)->byID($this->ID);
-		
 		Versioned::set_reading_mode($oldMode);
+		// in tests there is no value for $oldMode, so if it's not set use $stage
+		if (!$oldMode) {
+			$member->CanViewWhichStage = $stage;
+		}
+		
 		return $versionFromStage ? $versionFromStage->canView($member) : false;
 	}
 
