@@ -14,6 +14,7 @@ ShortcodeParser::get('default')->register('sitetree_link', array('SiteTree', 'li
 
 File::add_extension('SiteTreeFileExtension');
 SiteTree::add_extension('SiteTreeCacheExtension');
+SiteConfig::add_extension('SiteTreeCacheExtension');
 
 // TODO Remove once we can configure CMSMenu through static, nested configuration files
 CMSMenu::remove_menu_item('CMSMain');
