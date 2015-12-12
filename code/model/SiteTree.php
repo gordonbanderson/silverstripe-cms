@@ -98,6 +98,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 */
 	private static $hide_ancestor = null;
 
+	/**
+	 * @var SiteTree null if not set (ie top level) or the SiteTree object which is the parent
+	 */
+	private $_cached_parent = null;
+
+
 	private static $db = array(
 		"URLSegment" => "Varchar(255)",
 		"Title" => "Varchar(255)",
@@ -515,7 +521,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 */
 	public function RelativeLink($action = null) {
 		if($this->ParentID && self::config()->nested_urls) {
-			$parent = $this->Parent();
+			$parent = $this->cachedParent();
 			// If page is removed select parent from version history (for archive page view)
 			if((!$parent || !$parent->exists()) && $this->IsDeletedFromStage) {
 				$parent = Versioned::get_latest_version('SiteTree', $this->ParentID);
@@ -614,7 +620,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		if(empty($this->ParentID)) return false;
 
 		// Parent must exist and not be an orphan itself
-		$parent = $this->Parent();
+		$parent = $this->cachedParent();
 		return !$parent || !$parent->exists() || $parent->isOrphaned();
 	}
 
@@ -800,6 +806,21 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		}
 	}
 
+
+	public function cachedParent() {
+		$result = $this->_cached_parent;
+		$parentID = $this->getField("ParentID");
+		if (!$result && $parentID > 0) {
+			error_log('TRACE: cachedParent UNCACHED');
+			$result =  DataObject::get_by_id("SiteTree", $parentID);
+			$this->_cached_parent = $result;
+		} else {
+			error_log('TRACE: cachedParent CACHED');
+		}
+
+		return $result;
+	}
+
 	/**
 	 * Return a string of the form "parent - page" or "grandparent - parent - page" using page titles
 	 *
@@ -939,7 +960,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 		// check for inherit
 		if($this->CanViewType == 'Inherit') {
-			if($this->ParentID) return $this->Parent()->canView($member);
+			if($this->ParentID) return $this->cachedParent()->canView($member);
 			else return $this->getSiteConfig()->canViewPages($member);
 		}
 
@@ -1643,6 +1664,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	public function flushCache($persistent = true) {
 		parent::flushCache($persistent);
 		$this->_cache_statusFlags = null;
+		$this->_cached_parent = null;
 	}
 
 	public function validate() {
@@ -1693,7 +1715,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return bool
 	 */
 	public function validURLSegment() {
-		if(self::config()->nested_urls && $parent = $this->Parent()) {
+		if(self::config()->nested_urls && $parent = $this->cachedParent()) {
 			if($controller = ModelAsController::controller_for($parent)) {
 				if($controller instanceof Controller && $controller->hasAction($this->URLSegment)) return false;
 			}
@@ -1997,7 +2019,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 		$baseLink = Controller::join_links (
 			Director::absoluteBaseURL(),
-			(self::config()->nested_urls && $this->ParentID ? $this->Parent()->RelativeLink(true) : null)
+			(self::config()->nested_urls && $this->ParentID ? $this->cachedParent()->RelativeLink(true) : null)
 		);
 
 		$urlsegment = SiteTreeURLSegmentField::create("URLSegment", $this->fieldLabel('URLSegment'))
@@ -2909,7 +2931,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 */
 	public function getPageLevel() {
 		if($this->ParentID) {
-			return 1 + $this->Parent()->getPageLevel();
+			return 1 + $this->cachedParent()->getPageLevel();
 		}
 		return 1;
 	}
