@@ -3085,12 +3085,17 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 
 
 	public function getVersionByStage($stage) {
-		$record = (isset($_cached_by_stage[$stage])) ? $_cached_by_stage[$stage] : null;
+		$hash = spl_object_hash($this);
+		$record = (isset($this->_cached_by_stage[$stage])) ? $this->_cached_by_stage[$stage] : null;
 		if (!$record) {
+			error_log('TRACE: getVersionedByStage UNCACHED '.$this->ID . ' ' . $hash);
 			$record = Versioned::get_one_by_stage('SiteTree', $stage, array(
 				'"SiteTree"."ID"' => $this->ID
 			));
-			$_cached_by_stage[$stage] = $record;
+			$this->_cached_by_stage[$stage] = $record;
+			error_log('TRACE: getVersionedByStage CACHING '.$record);
+		} else {
+			error_log('TRACE: getVersionedByStage CACHED '.$this->ID . ' ' . $hash);
 		}
 		return $record;
 	}
