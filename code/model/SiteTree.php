@@ -243,16 +243,6 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	private static $cached_member_group_ids = array();
 
 	/**
-	 * @var If set this value is used for Parent() instead of making a database call.
-	 */
-	private $_cached_parent = null;
-
-	/**
-	 * @var  mapping of ID to relative link
-	 */
-	private static $_cached_relative_links = array();
-
-	/**
 	 * Determines if the system should avoid orphaned pages
 	 * by deleting all children when the their parent is deleted (TRUE),
 	 * or rather preserve this data even if its not reachable through any navigation path (FALSE).
@@ -524,44 +514,29 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return string
 	 */
 	public function RelativeLink($action = null) {
-		error_log('TRACE: RelativeLink for '.$this->ID);
-
-		$relativeLink = null;
-		if (!isset(self::$_cached_relative_links[$this->ID])) {
-			if($this->ParentID && self::config()->nested_urls) {
-				error_log('TRACE: T1');
-				$parent = $this->Parent();
-				// If page is removed select parent from version history (for archive page view)
-				if((!$parent || !$parent->exists()) && $this->IsDeletedFromStage) {
-					$parent = Versioned::get_latest_version('SiteTree', $this->ParentID);
-				}
-				$base = $parent->RelativeLink($this->URLSegment);
-			} elseif(!$action && $this->URLSegment == RootURLController::get_homepage_link()) {
-				// Unset base for root-level homepages.
-				// Note: Homepages with action parameters (or $action === true)
-				// need to retain their URLSegment.
-				$base = null;
-				error_log('TRACE: T2');
-			} else {
-				$base = $this->URLSegment;
-				error_log('TRACE: T3');
+		if($this->ParentID && self::config()->nested_urls) {
+			$parent = $this->Parent();
+			// If page is removed select parent from version history (for archive page view)
+			if((!$parent || !$parent->exists()) && $this->IsDeletedFromStage) {
+				$parent = Versioned::get_latest_version('SiteTree', $this->ParentID);
 			}
-error_log('TRACE: T4');
-			$this->extend('updateRelativeLink', $base, $action);
-
-			// Legacy support: If $action === true, retain URLSegment for homepages,
-			// but don't append any action
-			if($action === true) $action = null;
-
-			error_log('TRACE: RELATIVE LINK UNCACHED:'.Controller::join_links($base, '/', $action));
-
-			$relativeLink = Controller::join_links($base, '/', $action);
-			self::$_cached_relative_links[$this->ID] = $relativeLink;
+			$base = $parent->RelativeLink($this->URLSegment);
+		} elseif(!$action && $this->URLSegment == RootURLController::get_homepage_link()) {
+			// Unset base for root-level homepages.
+			// Note: Homepages with action parameters (or $action === true)
+			// need to retain their URLSegment.
+			$base = null;
 		} else {
-			$relativeLink = self::$_cached_relative_links[$this->ID];
-			error_log('TRACE: CACHED');
+			$base = $this->URLSegment;
 		}
-		return $relativeLink;
+
+		$this->extend('updateRelativeLink', $base, $action);
+
+		// Legacy support: If $action === true, retain URLSegment for homepages,
+		// but don't append any action
+		if($action === true) $action = null;
+
+		return Controller::join_links($base, '/', $action);
 	}
 
 	/**
@@ -820,19 +795,10 @@ error_log('TRACE: T4');
 	 * @return SiteTree Parent of this page
 	 */
 	public function getParent() {
-		error_log('TRACE T1: GETTING PARENT FOR ID '.$this->ParentID);
-		$parent = $this->_cached_parent;
-		$parentID = $this->getField("ParentID");
-		if (!$parent && $parentID > 0) {
-			error_log('TRACE T2: PARENT UNCACHED');
-			$parent = DataObject::get_by_id("SiteTree", $parentID);
-			$this->_cached_parent = $parent;
-		} else {
-			error_log('TRACE T3: PARENT CACHED');
+		if ($parentID = $this->getField("ParentID")) {
+			return DataObject::get_by_id("SiteTree", $parentID);
 		}
-		return $parent;
 	}
-
 
 	/**
 	 * Return a string of the form "parent - page" or "grandparent - parent - page" using page titles
@@ -1675,11 +1641,8 @@ error_log('TRACE: T4');
 	}
 
 	public function flushCache($persistent = true) {
-		error_log('TRACE: FLUSHING CACHE');
 		parent::flushCache($persistent);
 		$this->_cache_statusFlags = null;
-		self::$cached_member_group_ids = array();
-		$this->$_cached_parent = null;
 	}
 
 	public function validate() {
