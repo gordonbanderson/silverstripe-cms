@@ -246,7 +246,12 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * Associative array of Member ID -> Group IDs
 	 * @var array MemberID -> array(Group ID)
 	 */
-	private static $cached_member_group_ids = array();
+	private static $_cached_member_group_ids = array();
+
+	/**
+	 * @var array Mapping of name of Stage => SiteTree object from that stage
+	 */
+	private $_cached_by_stage = array();
 
 	/**
 	 * Determines if the system should avoid orphaned pages
@@ -554,9 +559,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	public function getAbsoluteLiveLink($includeStageEqualsLive = true) {
 		$oldStage = Versioned::current_stage();
 		Versioned::reading_stage('Live');
-		$live = Versioned::get_one_by_stage('SiteTree', 'Live', array(
-			'"SiteTree"."ID"' => $this->ID
-		));
+		$live = $this->getVersionByStage('Live');
 		if($live) {
 			$link = $live->AbsoluteLink();
 			if($includeStageEqualsLive) $link .= '?stage=Live';
@@ -1260,11 +1263,11 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 			//$ids = array_keys(array_filter(self::can_view_multiple($ids, $memberID)));
 
 			// Get the groups that the given member belongs to
-			if (isset(self::$cached_member_group_ids[$memberID])) {
-				$groupIDs = self::$cached_member_group_ids[$memberID];
+			if (isset(self::$_cached_member_group_ids[$memberID])) {
+				$groupIDs = self::$_cached_member_group_ids[$memberID];
 			} else {
 				$groupIDs = DataObject::get_by_id('Member', $memberID)->Groups()->column("ID");
-				self::$cached_member_group_ids[$memberID] = $groupIDs;
+				self::$_cached_member_group_ids[$memberID] = $groupIDs;
 			}
 
 			$SQL_groupList = implode(", ", $groupIDs);
@@ -1665,6 +1668,8 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		parent::flushCache($persistent);
 		$this->_cache_statusFlags = null;
 		$this->_cached_parent = null;
+		$this->_cached_by_stage = array();
+		$this->_cached_member_group_ids = array();
 	}
 
 	public function validate() {
@@ -1779,9 +1784,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return string
 	 */
 	public function getStageURLSegment() {
-		$stageRecord = Versioned::get_one_by_stage('SiteTree', 'Stage', array(
-			'"SiteTree"."ID"' => $this->ID
-		));
+		$stageRecord = $this->getVersionByStage('Stage');
 		return ($stageRecord) ? $stageRecord->URLSegment : null;
 	}
 
@@ -1791,9 +1794,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 * @return string
 	 */
 	public function getLiveURLSegment() {
-		$liveRecord = Versioned::get_one_by_stage('SiteTree', 'Live', array(
-			'"SiteTree"."ID"' => $this->ID
-		));
+		$liveRecord = $this->getVersionByStage('Live');
 		return ($liveRecord) ? $liveRecord->URLSegment : null;
 	}
 
@@ -2302,9 +2303,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		$rootTabSet->addExtraClass('ss-ui-action-tabset action-menus');
 
 		// Render page information into the "more-options" drop-up, on the top.
-		$live = Versioned::get_one_by_stage('SiteTree', 'Live', array(
-			'"SiteTree"."ID"' => $this->ID
-		));
+		$live = $this->getVersionByStage('Live');
 		$moreOptions->push(
 			new LiteralField('Information',
 				$this->customise(array(
@@ -2318,6 +2317,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		$stageOrLiveRecord = Versioned::get_one_by_stage($this->class, Versioned::current_stage(), array(
 			'"SiteTree"."ID"' => $this->ID
 		));
+		$stageOrLiveRecord = $this->getVersionByStage(Versioned::current_stage());
 		if($stageOrLiveRecord && $stageOrLiveRecord->Version != $this->Version) {
 			$moreOptions->push(FormAction::create('email', _t('CMSMain.EMAIL', 'Email')));
 			$moreOptions->push(FormAction::create('rollback', _t('CMSMain.ROLLBACK', 'Roll back to this version')));
@@ -2448,9 +2448,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	public function doPublish() {
 		if (!$this->canPublish()) return false;
 
-		$original = Versioned::get_one_by_stage("SiteTree", "Live", array(
-			'"SiteTree"."ID"' => $this->ID
-		));
+		$original = $this->getVersionByStage('Live');
 		if(!$original) $original = new SiteTree();
 
 		// Handle activities undertaken by extensions
@@ -3083,6 +3081,18 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 				'sort' => 100
 			)
 		);
+	}
+
+
+	public function getVersionByStage($stage) {
+		$record = (isset($_cached_by_stage[$stage])) ? $_cached_by_stage[$stage] : null;
+		if (!$record) {
+			$record = Versioned::get_one_by_stage('SiteTree', $stage, array(
+				'"SiteTree"."ID"' => $this->ID
+			));
+			$_cached_by_stage[$stage] = $record;
+		}
+		return $record;
 	}
 
 	/**
