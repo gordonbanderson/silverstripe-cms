@@ -363,9 +363,14 @@ class SilverStripeNavigatorItem_LiveLink extends SilverStripeNavigatorItem {
 
 	protected function getLivePage() {
 		$baseTable = ClassInfo::baseDataClass($this->record->class);
-		return Versioned::get_one_by_stage($baseTable, 'Live', array(
-			"\"$baseTable\".\"ID\"" => $this->record->ID
-		));
+		if ($baseTable == 'SiteTree') {
+			return $this->record->getVersionByStage('Live');
+		} else {
+			return Versioned::get_one_by_stage($baseTable, 'Live', array(
+				"\"$baseTable\".\"ID\"" => $this->record->ID
+			));
+		}
+
 	}
 }
 
