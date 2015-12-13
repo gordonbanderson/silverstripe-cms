@@ -305,9 +305,15 @@ class SilverStripeNavigatorItem_StageLink extends SilverStripeNavigatorItem {
 
 	protected function getDraftPage() {
 		$baseTable = ClassInfo::baseDataClass($this->record->class);
-		return Versioned::get_one_by_stage($baseTable, 'Stage', array(
-			"\"$baseTable\".\"ID\"" => $this->record->ID
-		));
+		error_log('TRACE: SilverStripeNavigator: '.$baseTable);
+		if ($baseTable == 'SiteTree') {
+			return $this->record->getVersionByStage('Stage');
+		} else {
+			return Versioned::get_one_by_stage($baseTable, 'Stage', array(
+				"\"$baseTable\".\"ID\"" => $this->record->ID
+			));
+		}
+
 	}
 }
 
