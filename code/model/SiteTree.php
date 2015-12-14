@@ -814,8 +814,9 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 		$result = $this->_cached_parent;
 		$parentID = $this->getField("ParentID");
 		if (!$result && $parentID > 0) {
-			error_log('TRACE: cachedParent UNCACHED');
-			$result =  DataObject::get_by_id("SiteTree", $parentID);
+			error_log('**** TRACE: cachedParent UNCACHED getting object by ID '.$parentID);
+			//$result =  DataObject::get_by_id("SiteTree", $parentID);
+			$result = $this->Parent();
 			$this->_cached_parent = $result;
 		} else {
 			error_log('TRACE: cachedParent CACHED');
@@ -2929,6 +2930,7 @@ class SiteTree extends DataObject implements PermissionProvider,i18nEntityProvid
 	 */
 	public function getPageLevel() {
 		if($this->ParentID) {
+			error_log("GET PAGE LEVEL, ParentID = ".$this->ParentID);
 			return 1 + $this->cachedParent()->getPageLevel();
 		}
 		return 1;
